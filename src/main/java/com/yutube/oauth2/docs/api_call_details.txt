@@ -1,0 +1,121 @@
+FLOW 1: Authorization Code Flow (Browser + Backend)
+------------------------------------------------------------------------------------------------------------
+GET authorisation code (From browser):
+--------------------------------------
+http://localhost:7072/oauth2/authorize?response_type=code&client_id=video-client&scope=openid profile video.upload&redirect_uri=http://localhost:7072/login/oauth2/code/video-client-oidc
+
+What happens
+- Redirects to /login
+- Enter username/password
+- Consent screen (if enabled)
+- Redirects to:
+    http://localhost:7072/login/oauth2/code/video-client-oidc?code=ziBGxIMaU3A2BR59GhF2NCSrguoBeIUlujTsBTIkH_K7EWWKiyRB_oG3bHhoIvJ0qF6qCHZbcU0I83OjZ6AtGZglixw7fw4ZBjbZv0aqcoBNhY256WAeIHQ45SRU4VUe
+- keep you code
+
+POST Exchange Code:
+------------------
+curl -X POST http://localhost:7072/oauth2/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -u video-client:secret \
+  -d "grant_type=authorization_code" \
+  -d "code=ffgGq65id2aLhsU_kV9efCJDNn4M56Rhgjf9sWlna9vKNx1TrU1uSumvdscHPeXk8Jc1yQ8C6dcIywy1qSmzDOSsbjK7dIe7vV3hoJGKksrKh5H9ATfGTrSVHqM6EDS7" \
+  -d "redirect_uri=http://localhost:7072/login/oauth2/code/video-client-oidc"
+
+Response:
+---------
+- Save access_token
+- Save refresh_token
+
+FLOW 2: Call Protected Resource (API):
+-----------------------------------------------------------------------------------------------------------------------
+Call Secured API:
+------------------
+curl -X POST http://localhost:8082/videos/upload \
+  -H "Authorization: Bearer eyJraWQiOiJjZWFkMWRmYS1mZWViLTRmYTgtODc3Yi01ZjFlZjBlZDNmN2EiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJoYW16YTAzMDYiLCJhdWQiOiJ2aWRlby1jbGllbnQiLCJuYmYiOjE3NjY0ODQ2MjQsInNjb3BlIjpbInZpZGVvLnVwbG9hZCIsIm9wZW5pZCIsInByb2ZpbGUiXSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo3MDcyIiwiZXhwIjoxNzY2NDg2NDI0LCJpYXQiOjE3NjY0ODQ2MjQsImp0aSI6IjE0NWFmYmU3LTAwNTUtNDg1MS1iZjJlLTNjODBlMDU2NjMxYyJ9.BBxMm6k_32baXAEJEEVNq3QBNZDMDX5oGs76_eJ96dTAPf5DeppYgi6Frd0chpgR22RG790nQyc4Ui0Zw38oeVeSEkCVCTq4KxMT7OQhxHJHBQPNYon56xTSgnODSLatBG7cHWRAb5pn1QdcGtX8Y8VG7Lf4wAWnMzFi1dYYN0ujuCIzB_kUKEnM-wAEPmqB_16IIC-q-lTxJlhIMOdamD-1RWKdXigSYqE5zrFIh24PjTqIoUK-BXyPJNYjNc53IH5wMEZEKjOmk6k8xcttGZS10TV_2quYHyl1pKjzV5s2_q8wHUL1KSO6rdhKIZMqs_tuo5A1Ub61FTgU0KY7Tw"
+
+FLOW 3: Refresh Token: Used when access token expires.
+-----------------------------------------------------------------------------------------------------------------------
+Refresh Access Token:
+---------------------
+curl -X POST http://localhost:7072/oauth2/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -u video-client:secret \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=PqsgWzzYNG7b1ln_Lly5iaqxe42zTwaT7nAyLouQ3J3WsjRpUZKbUhtlRpNqkqn3Ou0Lr8hZBo88IL7udJ65AFZHs_m3ZxZbsLbFLthaBeHzZ3DGXQyWPCu-8RmVa5Tu"
+
+Response:
+--------
+Old access token invalid
+New one active
+
+FLOW 4: Client Credentials (Machine-to-Machine): Used for service-to-service calls.
+-----------------------------------------------------------------------------------------------------------------------
+Get Token (No User):
+-------------------
+curl -X POST http://localhost:7072/oauth2/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -u video-client:secret \
+  -d "grant_type=client_credentials" \
+  -d "scope=video.upload"
+
+Response:
+--------
+{
+  "access_token": "service.jwt.token",
+  "token_type": "Bearer",
+  "expires_in": 900
+}
+
+FLOW 5: UserInfo (OIDC): Only works if openid scope present.
+-----------------------------------------------------------------------------------------------------------------------
+Call UserInfo:
+-------------
+curl -X GET http://localhost:7072/userinfo \
+  -H "Authorization: Bearer eyJraWQiOiJhNDg1ZDE3Yi1mMDk3LTQzNDMtYjBjNy01MjdiY2Q5MzQzZTIiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ2aWRlby1jbGllbnQiLCJhdWQiOiJ2aWRlby1jbGllbnQiLCJuYmYiOjE3NjY0ODYyNTAsInNjb3BlIjpbInZpZGVvLnVwbG9hZCJdLCJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjcwNzIiLCJleHAiOjE3NjY0ODgwNTAsImlhdCI6MTc2NjQ4NjI1MCwianRpIjoiYjJmOTg2OGYtMTU1OC00MjQ3LThmNTEtM2EzZWEyNGY3ZTAyIn0.Ve3nIDiCy-5Egi9b3imkSPEkTzHgKRh17Uqw_oluu3MUcCB6TmxVFpmHqWA9dXdXoCV6CX15WrZFYIwcdjMEV6HeYKEws-OiQczdHJLrS8b6Z53M1aOqz5kvSy67nqRe6GiuXSAjHz7sJmwjZVUGdKG6KqsHI-pyi87kJdr8RdNwYh6kirp8Pa-XIoyHgAqZ5fsdX3tpjNCjqOtc4xYWnOWS5INcwUzFGn3Y1BuOaUr-bCykoD01mOtyW9mJSVlKYorOrW2TgW3Q4VQoE_t9JmLzvTKdlkiYwRhXVAgRLGtn5cjATtkrmF7aY1YoUdmwmDTRe2rt2w_y-2Y4W_4_4w"
+
+Response
+{
+  "sub": "user1",
+  "username": "user1",
+  "roles": ["ROLE_USER"]
+}
+
+FLOW 6: Public Key (JWT Validation): Used by resource servers.
+-----------------------------------------------------------------------------------------------------------------------
+Fetch JWK:
+----------
+curl http://localhost:7072/oauth2/jwks
+
+Response:
+--------
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "abc123",
+      "use": "sig",
+      "n": "....",
+      "e": "AQAB"
+    }
+  ]
+}
+
+FLOW 7: OIDC Discovery: Used for auto-configuration.
+-----------------------------------------------------------------------------------------------------------------------
+Discovery Endpoint:
+------------------
+curl http://localhost:7072/.well-known/openid-configuration
+
+Response (partial):
+------------------
+{
+  "issuer": "http://localhost:9000",
+  "authorization_endpoint": "/oauth2/authorize",
+  "token_endpoint": "/oauth2/token",
+  "jwks_uri": "/oauth2/jwks",
+  "userinfo_endpoint": "/userinfo"
+}
+
+
+
+
